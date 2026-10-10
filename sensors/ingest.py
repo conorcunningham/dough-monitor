@@ -18,6 +18,7 @@ Two payload shapes are understood:
 """
 
 import json
+import math
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -34,6 +35,10 @@ class UnrecognisedMessage(ValueError):
 # (a WT450-TH sends three within a second) and rtl_433 reports every copy.
 # No sensor sends genuinely new readings this close together.
 REPEAT_WINDOW = timedelta(seconds=5)
+
+# The DS18B20's rated range. Nothing we measure (dough, kitchen) gets near either end,
+# so anything outside it is a corrupted packet, a sensor fault or a bad conversion.
+TEMPERATURE_RANGE_C = (-55.0, 125.0)
 
 
 @dataclass(frozen=True)
@@ -93,15 +98,15 @@ def _parse_probe(data):
     return ParsedReading(
         hardware_id=str(data['sensor_id']),
         recorded_at=_parse_time(data.get('ts')),
-        temperature_c=float(data['temperature_c']),
+        temperature_c=_parse_temperature(data['temperature_c']),
     )
 
 
 def _parse_rtl_433(data):
     if 'temperature_C' in data:
-        temperature_c = float(data['temperature_C'])
+        temperature_c = _parse_temperature(data['temperature_C'])
     elif 'temperature_F' in data:
-        temperature_c = (float(data['temperature_F']) - 32) * 5 / 9
+        temperature_c = _parse_temperature((_parse_number(data['temperature_F']) - 32) * 5 / 9)
     else:
         raise UnrecognisedMessage(f'rtl_433 event from {data["model"]} has no temperature.')
 
@@ -114,11 +119,32 @@ def _parse_rtl_433(data):
     )
 
 
+def _parse_number(value):
+    """A finite float from a JSON number or numeric string. Booleans and NaN/inf are rejected."""
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        raise ValueError(f'{value!r} is not a number.')
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError(f'{value!r} is not a finite number.')
+    return number
+
+
+def _parse_temperature(value):
+    temperature_c = _parse_number(value)
+    low, high = TEMPERATURE_RANGE_C
+    if not low <= temperature_c <= high:
+        raise ValueError(f'Temperature {temperature_c:g} C is outside {low:g}..{high:g} C.')
+    return temperature_c
+
+
 def _parse_humidity(value):
     # Cheap 433 MHz sensors occasionally send garbage; drop it rather than the whole reading.
     if value is None:
         return None
-    humidity = float(value)
+    try:
+        humidity = _parse_number(value)
+    except ValueError:
+        return None
     return humidity if 0 <= humidity <= 100 else None
 
 

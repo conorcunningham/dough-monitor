@@ -137,10 +137,53 @@ class UnrecognisedPayloadTests(SimpleTestCase):
             'unknown shape': payload(hello='world'),
             'bad temperature': payload(sensor_id='28-x', temperature_c='warm'),
             'bad time': payload(sensor_id='28-x', temperature_c=20, ts='yesterday'),
+            'null temperature': payload(sensor_id='28-x', temperature_c=None),
+            'list temperature': payload(sensor_id='28-x', temperature_c=[21.0]),
+            'boolean temperature': payload(sensor_id='28-x', temperature_c=True),
+            'nan temperature': b'{"sensor_id": "28-x", "temperature_c": NaN}',
+            'infinite temperature': b'{"sensor_id": "28-x", "temperature_c": Infinity}',
+            'rtl_433 bad temperature': payload(model='Nexus-TH', id=1, temperature_C='21,5'),
+            'rtl_433 bad fahrenheit': payload(model='LaCrosse-TX', id=1, temperature_F=None),
         }
         for name, raw in cases.items():
             with self.subTest(name), self.assertRaises(UnrecognisedMessage):
                 parse_payload(raw)
+
+
+class TemperatureValidationTests(SimpleTestCase):
+    def test_accepts_numbers_and_numeric_strings(self):
+        cases = {'int': 21, 'float': 21.5, 'string': '21.5', 'negative': -20.25}
+        for name, value in cases.items():
+            with self.subTest(name):
+                parsed = parse_payload(payload(sensor_id='28-x', temperature_c=value))
+                self.assertEqual(parsed.temperature_c, float(value))
+
+    def test_accepts_range_limits(self):
+        for value in (-55, 125):
+            with self.subTest(value):
+                parsed = parse_payload(payload(model='Nexus-TH', id=1, temperature_C=value))
+                self.assertEqual(parsed.temperature_c, value)
+
+    def test_rejects_out_of_range_celsius(self):
+        for value in (-55.1, 125.1, 850.0, -3276.8):
+            with self.subTest(value), self.assertRaisesMessage(UnrecognisedMessage, 'outside'):
+                parse_payload(payload(sensor_id='28-x', temperature_c=value))
+
+    def test_rejects_out_of_range_after_fahrenheit_conversion(self):
+        with self.assertRaisesMessage(UnrecognisedMessage, 'outside'):
+            parse_payload(payload(model='LaCrosse-TX', id=1, temperature_F=300.0))
+
+    def test_non_finite_humidity_is_dropped_not_fatal(self):
+        cases = {
+            'nan': b'{"model": "Nexus-TH", "id": 1, "temperature_C": 21.0, "humidity": NaN}',
+            'text': payload(model='Nexus-TH', id=1, temperature_C=21.0, humidity='damp'),
+            'boolean': payload(model='Nexus-TH', id=1, temperature_C=21.0, humidity=True),
+        }
+        for name, raw in cases.items():
+            with self.subTest(name):
+                parsed = parse_payload(raw)
+                self.assertEqual(parsed.temperature_c, 21.0)
+                self.assertIsNone(parsed.humidity)
 
 
 class StoreReadingTests(TestCase):
