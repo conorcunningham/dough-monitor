@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Publish DS18B20 probe temperatures to MQTT. Runs on the Raspberry Pi.
 
-Setup on the Pi:
+Setup on the Pi: ``sudo pi/setup.sh`` does all of this. By hand:
     1. Enable 1-Wire: add ``dtoverlay=w1-gpio`` to /boot/firmware/config.txt and reboot.
     2. Check the probe shows up: ``ls /sys/bus/w1/devices/`` should list ``28-...``.
     3. ``sudo apt install python3-paho-mqtt``.
@@ -105,7 +105,10 @@ def main():
     logger.info('Publishing to %s:%s every %ss under %s/', host, port, interval, topic_prefix)
 
     if not find_probes():
-        logger.warning('No DS18B20 probes found in %s. Is 1-Wire enabled?', W1_DEVICES)
+        logger.warning(
+            'No DS18B20 probes found in %s (1-Wire overlay loaded? probe wired?). Will keep looking.',
+            W1_DEVICES,
+        )
 
     try:
         while True:

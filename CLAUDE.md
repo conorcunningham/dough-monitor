@@ -73,7 +73,7 @@ The data will be fetched using MQTT. MQTT is push-based, so this is a long-runni
 ## Hardware
 - The MQTT broker (Mosquitto) runs on a Raspberry Pi.
 - Pi sensors: an RTL-SDR USB receiver picking up a 433 MHz temperature/humidity sensor (via rtl_433), plus a wired waterproof DS18B20 probe.
-- `pi/` holds everything that runs on the Pi: the DS18B20 publisher script, the rtl_433 config and their systemd units.
+- `pi/` holds everything that runs on the Pi: the DS18B20 publisher script, the rtl_433 and Mosquitto config, their systemd units, and the playbook: `setup.sh` (idempotent installer, run with sudo on the Pi), `check.sh` (read-only end-to-end check) and `bootstrap.sh` (runs both from the laptop over SSH).
 - Django runs on a laptop / Linux desktop, possibly a GCP micro-server later (which would need broker TLS/auth or a VPN).
 
 # Testing

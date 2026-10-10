@@ -18,7 +18,15 @@ DS18B20 probe ─1-Wire─▶ ds18b20_publisher.py ─┐
 
 ## Raspberry Pi setup
 
-Everything on the Pi is a standard Raspberry Pi OS package plus the files in `pi/`, so clone this repo onto the Pi.
+Flash Raspberry Pi OS Lite (trixie or newer) with Raspberry Pi Imager, turning on SSH and setting your user in its settings. Everything the Pi needs is a standard package plus the files in `pi/`, and `pi/setup.sh` installs all of it. From your laptop:
+
+```
+pi/bootstrap.sh conor@doughie.local
+```
+
+That copies `pi/` to the Pi, runs `setup.sh` there with sudo and finishes with `check.sh`, which tests every link in the chain and shows the probe's ID and the 433 MHz traffic it hears, ready to register. Both are safe to re-run: `setup.sh` only changes what differs and restarts only the service concerned, so it is also how changes to `pi/` get rolled out. Alternatively clone this repo on the Pi and run `sudo pi/setup.sh` there.
+
+The rest of this section is what the script does, for when something needs a closer look.
 
 ### MQTT broker
 
@@ -26,14 +34,15 @@ Everything on the Pi is a standard Raspberry Pi OS package plus the files in `pi
 sudo apt install mosquitto mosquitto-clients
 ```
 
-Mosquitto 2 only listens on localhost until you give it a listener. Create `/etc/mosquitto/conf.d/lan.conf`:
+Mosquitto 2 only listens on localhost until you give it a listener. `pi/mosquitto-lan.conf`, installed as `/etc/mosquitto/conf.d/lan.conf`, opens it to the LAN without a password and raises the per-client queue so a night's readings survive the app being offline:
 
 ```
 listener 1883
 allow_anonymous true
+max_queued_messages 20000
 ```
 
-and `sudo systemctl restart mosquitto`. That is fine on a home LAN. Add a password file (and set `MQTT_USERNAME`/`MQTT_PASSWORD` in `.env`) before exposing the broker any further.
+then `sudo systemctl restart mosquitto`. That is fine on a home LAN. Add a password file (and set `MQTT_USERNAME`/`MQTT_PASSWORD` in `.env`) before exposing the broker any further.
 
 ### Room sensor: RTL-SDR and rtl_433
 
@@ -41,13 +50,13 @@ and `sudo systemctl restart mosquitto`. That is fine on a home LAN. Add a passwo
 sudo apt install rtl-433 rtl-sdr
 ```
 
-Installing `rtl-433` pulls in `librtlsdr0`, which blacklists the kernel's DVB-T driver so the dongle is free for SDR use. Unplug and re-plug the dongle (or reboot) after installing, then check it is seen:
+Installing `rtl-433` pulls in `librtlsdr0` and the udev rule that lets the `plugdev` group use the dongle. The kernel still claims it as a DVB-T receiver at boot; rtl_433 detaches it, but it is cleaner to keep the kernel off it altogether, which `pi/rtl-sdr-blacklist.conf` does once copied to `/etc/modprobe.d/`. Unplug and re-plug the dongle (or reboot), then check it is seen:
 
 ```
 rtl_test -t
 ```
 
-An RTL-SDR Blog V4 needs a recent `librtlsdr`. If `rtl_test` prints "RTL-SDR Blog V4 Detected" you are set; if it only reports a generic R828D tuner and rtl_433 hears nothing, install the driver from [rtl-sdr.com/V4](https://www.rtl-sdr.com/V4) first.
+An RTL-SDR Blog V4 needs `librtlsdr` 2.0 or newer, which Raspberry Pi OS trixie ships. If `rtl_test` prints "RTL-SDR Blog V4 Detected" you are set. If it only reports a generic R828D tuner, the driver predates the V4 (bookworm and older) and rtl_433 will run but hear nothing: update the OS rather than building the [rtl-sdr.com](https://www.rtl-sdr.com/V4) driver, which replaces `librtlsdr0` and takes the `rtl-433` package with it.
 
 Now listen for the sensor. Put it within a metre of the dongle and you should see an event within a minute or two (most sensors transmit every 30–60 s) even with no antenna attached. If you need more range, a bare wire about 17 cm long pushed into the centre of the SMA socket is a serviceable quarter-wave antenna for 433 MHz.
 
@@ -72,6 +81,8 @@ sudo systemctl enable --now rtl_433
 mosquitto_sub -t 'rtl_433/#' -v        # one event per transmission
 ```
 
+While the service runs it owns the dongle, so a by-hand `rtl_test` or `rtl_433` fails with `usb_claim_interface error -6`. Stop it with `sudo systemctl stop rtl_433` for manual tests and start it again afterwards.
+
 ### Dough probe: DS18B20
 
 The waterproof probe has three leads. Colours vary by vendor, so check the listing, but usually red is power, black (sometimes blue) is ground and yellow (sometimes white) is data. On a breadboard, with male-to-female jumpers to the Pi header:
@@ -84,7 +95,7 @@ The waterproof probe has three leads. Colours vary by vendor, so check the listi
 
 plus a 4.7 kΩ resistor (yellow-violet-red) between the data row and the 3.3 V row. Use 3.3 V, not 5 V: the pull-up would put 5 V on a GPIO pin.
 
-Enable 1-Wire by adding `dtoverlay=w1-gpio` to `/boot/firmware/config.txt` and reboot. The probe then shows up as a directory named after its ROM ID, which is also its hardware ID in the app:
+Enable 1-Wire by adding `dtoverlay=w1-gpio` to `/boot/firmware/config.txt` for every boot from now on, and `sudo dtoverlay w1-gpio` to load it right away without rebooting. The probe then shows up as a directory named after its ROM ID, which is also its hardware ID in the app:
 
 ```
 ls /sys/bus/w1/devices/                  # 28-0123456789ab  w1_bus_master1
