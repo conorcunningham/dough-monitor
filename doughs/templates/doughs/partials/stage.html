@@ -1,0 +1,15 @@
+{% load dough_tags %}
+<article>
+  <header><strong>{{ label }}</strong></header>
+  {% if ended_at %}
+    <p class="reading">{{ duration|duration }}</p>
+    <small>{{ started_at|time:'H:i' }} – {{ ended_at|time:'H:i' }}</small>
+  {% elif started_at %}
+    <p>Running since {{ started_at|time:'H:i' }}</p>
+    {% url 'doughs:timer' dough.pk stop_action as url %}
+    {% include 'doughs/partials/action.html' with label='Stop '|add:label class='contrast' %}
+  {% else %}
+    {% url 'doughs:timer' dough.pk start_action as url %}
+    {% include 'doughs/partials/action.html' with label='Start '|add:label %}
+  {% endif %}
+</article>

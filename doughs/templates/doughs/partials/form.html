@@ -1,0 +1,40 @@
+<form id="dough-form" method="post" action="{% url 'doughs:detail' dough.pk %}" hx-post="{% url 'doughs:detail' dough.pk %}" hx-target="this" hx-swap="outerHTML">
+  {% csrf_token %}
+  {% if saved %}<p class="message success" role="status">Saved.</p>{% endif %}
+  {{ form.non_field_errors }}
+
+  <article>
+    <header><strong>Ingredients</strong></header>
+    <div class="grid fields">
+      {% for field in form.ingredients %}<div>{{ field.as_field_group }}</div>{% endfor %}
+    </div>
+    <small>
+      Hydration {% if dough.hydration_percent is not None %}{{ dough.hydration_percent|floatformat:1 }}%{% else %}—{% endif %}
+      · Salt {% if dough.salt_percent is not None %}{{ dough.salt_percent|floatformat:1 }}%{% else %}—{% endif %}
+    </small>
+  </article>
+
+  <article>
+    <header><strong>Bake</strong></header>
+    <div class="grid fields">
+      {% for field in form.bake %}<div>{{ field.as_field_group }}</div>{% endfor %}
+    </div>
+  </article>
+
+  <article>
+    <header><strong>Outcome</strong></header>
+    <div class="grid fields">
+      {% for field in form.outcome %}<div>{{ field.as_field_group }}</div>{% endfor %}
+    </div>
+    {{ form.notes.as_field_group }}
+  </article>
+
+  <details>
+    <summary>Sensors</summary>
+    <div class="grid fields">
+      {% for field in form.sensors %}<div>{{ field.as_field_group }}</div>{% endfor %}
+    </div>
+  </details>
+
+  <button type="submit">Save</button>
+</form>

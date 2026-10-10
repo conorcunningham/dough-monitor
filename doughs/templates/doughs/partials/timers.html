@@ -1,0 +1,40 @@
+<section id="timers">
+  {% if error %}<p class="message error" role="alert">{{ error }}</p>{% endif %}
+
+  <div class="grid">
+    {% include 'doughs/partials/stage.html' with label='Fermentation' started_at=dough.fermentation_started_at ended_at=dough.fermentation_ended_at duration=dough.fermentation_duration start_action='start-fermentation' stop_action='stop-fermentation' %}
+    {% include 'doughs/partials/stage.html' with label='Proofing' started_at=dough.proofing_started_at ended_at=dough.proofing_ended_at duration=dough.proofing_duration start_action='start-proofing' stop_action='stop-proofing' %}
+  </div>
+
+  <div class="grid">
+    <article>
+      <header><strong>Folds</strong></header>
+      {% with folds=dough.folds.all %}
+        {% if folds %}
+          <ol class="folds">
+            {% for fold in folds %}
+              <li>
+                {{ fold.folded_at|time:'H:i' }}
+                {% url 'doughs:fold_delete' dough.pk fold.pk as url %}
+                {% include 'doughs/partials/action.html' with label='Remove' class='outline secondary small' %}
+              </li>
+            {% endfor %}
+          </ol>
+        {% endif %}
+      {% endwith %}
+      {% url 'doughs:fold_add' dough.pk as url %}
+      {% include 'doughs/partials/action.html' with label='Add fold' %}
+    </article>
+
+    <article>
+      <header><strong>Readings</strong></header>
+      {% if dough.is_collecting %}
+        <p>Collecting since {{ dough.started_at|time:'H:i' }}</p>
+        {% url 'doughs:timer' dough.pk 'start-shaping' as url %}
+        {% include 'doughs/partials/action.html' with label='Start shaping' class='contrast' confirm='Stop collecting readings for this dough?' %}
+      {% else %}
+        <p>Stopped at {{ dough.collection_ended_at|date:'D j M, H:i' }}</p>
+      {% endif %}
+    </article>
+  </div>
+</section>

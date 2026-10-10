@@ -1,0 +1,22 @@
+# systemd unit for the DS18B20 publisher.
+#   sudo apt install python3-paho-mqtt
+#   sudo install -m 755 pi/ds18b20_publisher.py /usr/local/bin/
+#   sudo cp pi/dough-probe.service /etc/systemd/system/
+#   sudo systemctl enable --now dough-probe
+# Runs as a throwaway system user; the 1-Wire files under /sys are world-readable,
+# so nothing here needs editing for your username or paths.
+[Unit]
+Description=Dough Monitor DS18B20 probe publisher
+After=network-online.target mosquitto.service
+Wants=network-online.target
+
+[Service]
+DynamicUser=yes
+ExecStart=/usr/bin/python3 /usr/local/bin/ds18b20_publisher.py
+Environment=MQTT_HOST=localhost
+Environment=PROBE_INTERVAL=30
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

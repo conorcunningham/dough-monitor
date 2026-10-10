@@ -1,0 +1,151 @@
+# Dough Monitor
+
+Tracks the temperature of bread dough against the temperature of the room it is rising in, so you can see what the dough actually did rather than what the recipe said it would.
+
+A Raspberry Pi reads two sensors and publishes them over MQTT:
+
+- a waterproof DS18B20 probe in the dough, wired to the Pi's GPIO
+- a cheap 433 MHz temperature/humidity sensor for the room, picked up by an RTL-SDR dongle and decoded by [rtl_433](https://github.com/merbanan/rtl_433)
+
+A Django app listens to the broker, stores the readings in Postgres and shows the current dough with a live chart. Folds, fermentation and proofing are recorded with buttons as they happen.
+
+```
+DS18B20 probe ─1-Wire─▶ ds18b20_publisher.py ─┐
+                                              ├─▶ Mosquitto ─▶ manage.py mqtt_listen ─▶ Postgres ─▶ Django + htmx
+433 MHz sensor ─radio─▶ RTL-SDR ─▶ rtl_433 ───┘
+└──────────────── Raspberry Pi ───────────────┘   └──────────────── laptop or server ────────────────┘
+```
+
+## Raspberry Pi setup
+
+Everything on the Pi is a standard Raspberry Pi OS package plus the files in `pi/`, so clone this repo onto the Pi.
+
+### MQTT broker
+
+```
+sudo apt install mosquitto mosquitto-clients
+```
+
+Mosquitto 2 only listens on localhost until you give it a listener. Create `/etc/mosquitto/conf.d/lan.conf`:
+
+```
+listener 1883
+allow_anonymous true
+```
+
+and `sudo systemctl restart mosquitto`. That is fine on a home LAN. Add a password file (and set `MQTT_USERNAME`/`MQTT_PASSWORD` in `.env`) before exposing the broker any further.
+
+### Room sensor: RTL-SDR and rtl_433
+
+```
+sudo apt install rtl-433 rtl-sdr
+```
+
+Installing `rtl-433` pulls in `librtlsdr0`, which blacklists the kernel's DVB-T driver so the dongle is free for SDR use. Unplug and re-plug the dongle (or reboot) after installing, then check it is seen:
+
+```
+rtl_test -t
+```
+
+An RTL-SDR Blog V4 needs a recent `librtlsdr`. If `rtl_test` prints "RTL-SDR Blog V4 Detected" you are set; if it only reports a generic R828D tuner and rtl_433 hears nothing, install the driver from [rtl-sdr.com/V4](https://www.rtl-sdr.com/V4) first.
+
+Now listen for the sensor. Put it within a metre of the dongle and you should see an event within a minute or two (most sensors transmit every 30–60 s) even with no antenna attached. If you need more range, a bare wire about 17 cm long pushed into the centre of the SMA socket is a serviceable quarter-wave antenna for 433 MHz.
+
+```
+rtl_433 -F json -M level
+```
+
+Each transmission prints one JSON line, with exactly the field names the app sees:
+
+```
+{"time" : "2026-10-09 12:00:00", "model" : "Nexus-TH", "id" : 42, "channel" : 1, "battery_ok" : 1, "temperature_C" : 21.3, "humidity" : 55, "mic" : "CHECKSUM", "rssi" : -0.1, "snr" : 20.5, "noise" : -20.6}
+```
+
+The sensor's hardware ID in the app is `model/channel/id`, so `Nexus-TH/1/42` here (just `model/id` if there is no channel). You will see your neighbours' sensors and the odd passing car's tyre-pressure sensor too; yours is the one with `rssi` near 0 and the highest `snr`. The app ignores anything you have not registered. Some sensors repeat each reading two or three times per transmission; the app stores one.
+
+Once it is hearing the sensor, run it as a service with the config in `pi/rtl_433.conf`, which publishes to the broker with timestamps that carry their UTC offset. The unit runs as a throwaway system user in the `plugdev` group, so it needs no editing:
+
+```
+sudo install -D -m 644 pi/rtl_433.conf /etc/rtl_433/rtl_433.conf
+sudo cp pi/rtl_433.service /etc/systemd/system/
+sudo systemctl enable --now rtl_433
+mosquitto_sub -t 'rtl_433/#' -v        # one event per transmission
+```
+
+### Dough probe: DS18B20
+
+The waterproof probe has three leads. Colours vary by vendor, so check the listing, but usually red is power, black (sometimes blue) is ground and yellow (sometimes white) is data. On a breadboard, with male-to-female jumpers to the Pi header:
+
+| Probe lead     | Pi header pin  |
+| -------------- | -------------- |
+| red, power     | pin 1, 3.3 V   |
+| black, ground  | pin 6, GND     |
+| yellow, data   | pin 7, GPIO 4  |
+
+plus a 4.7 kΩ resistor (yellow-violet-red) between the data row and the 3.3 V row. Use 3.3 V, not 5 V: the pull-up would put 5 V on a GPIO pin.
+
+Enable 1-Wire by adding `dtoverlay=w1-gpio` to `/boot/firmware/config.txt` and reboot. The probe then shows up as a directory named after its ROM ID, which is also its hardware ID in the app:
+
+```
+ls /sys/bus/w1/devices/                  # 28-0123456789ab  w1_bus_master1
+cat /sys/bus/w1/devices/28-*/w1_slave    # ... crc=57 YES / ... t=23125
+```
+
+`t=23125` is 23.125 °C. If the first line ends in `NO`, or only `w1_bus_master1` is listed, recheck the wiring and the resistor. Pinch the probe tip and the number should climb.
+
+Install the publisher. Like the rtl_433 unit it runs as a throwaway system user, so nothing needs editing:
+
+```
+sudo apt install python3-paho-mqtt
+sudo install -m 755 pi/ds18b20_publisher.py /usr/local/bin/
+sudo cp pi/dough-probe.service /etc/systemd/system/
+sudo systemctl enable --now dough-probe
+mosquitto_sub -t 'dough-monitor/#' -v    # a reading every 30 s
+```
+
+The script's docstring lists the environment variables it reads; set them with `Environment=` lines in the unit.
+
+## Running the app
+
+Requires Python 3.14, [uv](https://docs.astral.sh/uv/) and Postgres 16+.
+
+```
+cp .env.example .env        # then set the secret key, DATABASE_URL and MQTT_HOST
+uv sync
+uv run python manage.py migrate
+uv run python manage.py createsuperuser
+uv run python manage.py runserver
+```
+
+In a second terminal start the MQTT listener. It runs until stopped and reconnects by itself; while it is off, the broker queues readings for it.
+
+```
+uv run python manage.py mqtt_listen
+```
+
+### Registering sensors
+
+Readings are only stored for sensors you have registered. When the listener hears one it does not know, it logs the ID once:
+
+```
+INFO sensors.mqtt: Ignoring unregistered sensor 'Nexus-TH/1/42' on rtl_433/raspberrypi/events (21.3 °C). Add it in the admin to record it.
+```
+
+Add it at `http://localhost:8000/admin/sensors/sensor/` with that hardware ID, a name and a kind (ambient for the room sensor, dough for the probe). The next reading is stored; no restart needed. If a battery change gives a 433 MHz sensor a new ID, edit the hardware ID on the existing sensor rather than creating a new one, so its history stays attached.
+
+### Smoke test without the hardware
+
+From the Pi, or anywhere with `mosquitto_pub`, publish a fake rtl_433 event and watch the listener log it:
+
+```
+mosquitto_pub -h raspberrypi.local -t rtl_433/test/events \
+  -m '{"time":"2026-10-09T12:00:00+0200","model":"Nexus-TH","id":42,"channel":1,"temperature_C":21.3,"humidity":55}'
+```
+
+## Tests
+
+```
+uv run python manage.py test --parallel
+```
+
+The database user needs `CREATEDB` so the parallel runner can create its test databases.

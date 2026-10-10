@@ -120,6 +120,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 
 # Email
@@ -130,3 +132,32 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+
+
+# Logging
+# https://docs.djangoproject.com/en/6.1/topics/logging/
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {'format': '{asctime} {levelname} {name}: {message}', 'style': '{'},
+    },
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'simple'},
+    },
+    'loggers': {
+        'sensors': {'handlers': ['console'], 'level': env('DJANGO_LOG_LEVEL', default='INFO')},
+    },
+}
+
+
+# MQTT
+# The broker runs on the Raspberry Pi; see `manage.py mqtt_listen`.
+
+MQTT_HOST = env('MQTT_HOST', default='localhost')
+MQTT_PORT = env.int('MQTT_PORT', default=1883)
+MQTT_USERNAME = env('MQTT_USERNAME', default='')
+MQTT_PASSWORD = env('MQTT_PASSWORD', default='')
+MQTT_CLIENT_ID = env('MQTT_CLIENT_ID', default='dough-monitor')
+MQTT_TOPICS = env.list('MQTT_TOPICS', default=['dough-monitor/#', 'rtl_433/+/events'])

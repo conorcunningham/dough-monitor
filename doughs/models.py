@@ -112,6 +112,14 @@ class Dough(models.Model):
         else:
             super().save(*args, **kwargs)
 
+    @classmethod
+    def start_new(cls):
+        """Start a dough now, using the only dough/ambient sensor when there is exactly one of each."""
+        return cls.objects.create(
+            dough_sensor=_only_sensor(Sensor.Kind.DOUGH),
+            ambient_sensor=_only_sensor(Sensor.Kind.AMBIENT),
+        )
+
     # Derived values
 
     @property
@@ -205,6 +213,11 @@ class Fold(models.Model):
 
     def __str__(self):
         return f'Fold @ {timezone.localtime(self.folded_at):%H:%M}'
+
+
+def _only_sensor(kind):
+    sensors = list(Sensor.objects.filter(kind=kind)[:2])
+    return sensors[0] if len(sensors) == 1 else None
 
 
 def _duration(started_at, ended_at):

@@ -214,3 +214,23 @@ class FoldTests(TestCase):
         dough.delete()
 
         self.assertFalse(Fold.objects.exists())
+
+
+class StartNewTests(TestCase):
+    def test_uses_the_only_sensor_of_each_kind(self):
+        probe = Sensor.objects.create(hardware_id='28-0123456789ab', name='Probe', kind=Sensor.Kind.DOUGH)
+        kitchen = Sensor.objects.create(hardware_id='Nexus-TH/42', name='Kitchen', kind=Sensor.Kind.AMBIENT)
+
+        dough = Dough.start_new()
+
+        self.assertEqual(dough.dough_sensor, probe)
+        self.assertEqual(dough.ambient_sensor, kitchen)
+
+    def test_leaves_sensor_empty_when_choice_is_ambiguous(self):
+        Sensor.objects.create(hardware_id='28-0123456789ab', name='Probe', kind=Sensor.Kind.DOUGH)
+        Sensor.objects.create(hardware_id='28-ba9876543210', name='Probe 2', kind=Sensor.Kind.DOUGH)
+
+        dough = Dough.start_new()
+
+        self.assertIsNone(dough.dough_sensor)
+        self.assertIsNone(dough.ambient_sensor)

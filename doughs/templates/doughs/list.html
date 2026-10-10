@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% load dough_tags %}
+
+{% block title %}Doughs · Dough Monitor{% endblock %}
+
+{% block content %}
+<hgroup>
+  <h1>Doughs</h1>
+  <p>Starting a dough begins collecting readings from its sensors now.</p>
+</hgroup>
+
+<form method="post" action="{% url 'doughs:start' %}">
+  {% csrf_token %}
+  <button type="submit">Start new dough</button>
+</form>
+
+{% if doughs %}
+<div class="overflow-auto">
+  <table class="striped">
+    <thead>
+      <tr>
+        <th>Started</th>
+        <th>Sensor</th>
+        <th>Hydration</th>
+        <th>Fermentation</th>
+        <th>Proofing</th>
+        <th>Rise</th>
+        <th>Rating</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for dough in doughs %}
+      <tr>
+        <td>
+          <a href="{% url 'doughs:detail' dough.pk %}">{{ dough.started_at|date:'D j M Y, H:i' }}</a>
+          {% if dough.is_collecting %}<mark>collecting</mark>{% endif %}
+        </td>
+        <td>{{ dough.dough_sensor|default:'—' }}</td>
+        <td>{% if dough.hydration_percent is not None %}{{ dough.hydration_percent|floatformat:1 }}%{% else %}—{% endif %}</td>
+        <td>{{ dough.fermentation_duration|duration|default:'—' }}</td>
+        <td>{{ dough.proofing_duration|duration|default:'—' }}</td>
+        <td>{{ dough.get_rise_display|default:'—' }}</td>
+        <td>{{ dough.rating|default:'—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p>No doughs yet.</p>
+{% endif %}
+{% endblock %}

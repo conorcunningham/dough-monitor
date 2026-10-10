@@ -1,0 +1,30 @@
+{% load dough_tags %}
+{% with dough_reading=dough.dough_readings.last ambient_reading=dough.ambient_readings.last %}
+<section id="latest" class="grid"{% if dough.is_collecting %} hx-get="{% url 'doughs:latest' dough.pk %}" hx-trigger="every 30s" hx-swap="outerHTML"{% endif %}>
+  <article>
+    <header><strong>Dough</strong>{% if dough.dough_sensor %} · {{ dough.dough_sensor }}{% endif %}</header>
+    {% if not dough.dough_sensor %}
+      <p>No dough sensor selected.</p>
+    {% elif dough_reading %}
+      <p class="reading">{{ dough_reading.temperature_c|floatformat:1 }} °C</p>
+      <small>{{ dough_reading.recorded_at|timesince }} ago{% if dough.is_collecting and dough_reading|is_stale %} <mark>stale</mark>{% endif %}</small>
+    {% else %}
+      <p>No readings yet.</p>
+    {% endif %}
+  </article>
+  <article>
+    <header><strong>Ambient</strong>{% if dough.ambient_sensor %} · {{ dough.ambient_sensor }}{% endif %}</header>
+    {% if not dough.ambient_sensor %}
+      <p>No ambient sensor selected.</p>
+    {% elif ambient_reading %}
+      <p class="reading">
+        {{ ambient_reading.temperature_c|floatformat:1 }} °C
+        {% if ambient_reading.humidity is not None %}<small>· {{ ambient_reading.humidity|floatformat:0 }}% RH</small>{% endif %}
+      </p>
+      <small>{{ ambient_reading.recorded_at|timesince }} ago{% if dough.is_collecting and ambient_reading|is_stale %} <mark>stale</mark>{% endif %}</small>
+    {% else %}
+      <p>No readings yet.</p>
+    {% endif %}
+  </article>
+</section>
+{% endwith %}

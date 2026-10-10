@@ -12,7 +12,10 @@ class Sensor(models.Model):
     hardware_id = models.CharField(
         max_length=100,
         unique=True,
-        help_text='DS18B20 ROM ID (e.g. 28-0123456789ab) or rtl_433 model/id.',
+        help_text=(
+            'DS18B20 ROM ID (e.g. 28-0123456789ab) or rtl_433 model/channel/id (e.g. Nexus-TH/1/42). '
+            'The MQTT listener logs the exact ID of any unregistered sensor it hears.'
+        ),
     )
     name = models.CharField(max_length=100)
     kind = models.CharField(max_length=10, choices=Kind.choices)

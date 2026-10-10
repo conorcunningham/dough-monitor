@@ -1,0 +1,40 @@
+.reading {
+  font-size: 2rem;
+  font-weight: 600;
+  margin-bottom: 0;
+}
+
+.message.error {
+  color: var(--pico-del-color);
+}
+
+.message.success {
+  color: var(--pico-ins-color);
+}
+
+/* Action buttons are wrapped in their own forms; don't let them add form spacing. */
+#timers form {
+  margin-bottom: 0;
+}
+
+#timers button {
+  width: 100%;
+}
+
+.folds li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.folds button.small {
+  width: auto;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+#readings-chart {
+  max-height: 22rem;
+}

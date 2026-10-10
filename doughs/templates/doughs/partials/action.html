@@ -1,0 +1,5 @@
+{# A POST button that swaps #timers via htmx, and still works as a plain form without JavaScript. #}
+<form method="post" action="{{ url }}" hx-post="{{ url }}" hx-target="#timers" hx-swap="outerHTML"{% if confirm %} hx-confirm="{{ confirm }}"{% endif %}>
+  {% csrf_token %}
+  <button type="submit"{% if class %} class="{{ class }}"{% endif %}>{{ label }}</button>
+</form>
