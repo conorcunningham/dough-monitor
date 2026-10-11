@@ -1,0 +1,16 @@
+# Dough Monitor web app: gunicorn serving Django (static files via WhiteNoise).
+# Installed by deploy/install.sh; expects a checkout with .env and .venv at WorkingDirectory.
+[Unit]
+Description=Dough Monitor web app
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+User=conor
+WorkingDirectory=/home/conor/dough-monitor
+ExecStart=/home/conor/dough-monitor/.venv/bin/gunicorn dough_monitor.wsgi:application --bind 0.0.0.0:8000 --workers 2 --access-logfile -
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

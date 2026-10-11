@@ -1,0 +1,17 @@
+# Dough Monitor MQTT listener: subscribes to the broker on the sensor Pi and stores readings.
+# Installed by deploy/install.sh; expects a checkout with .env and .venv at WorkingDirectory.
+[Unit]
+Description=Dough Monitor MQTT listener
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+User=conor
+WorkingDirectory=/home/conor/dough-monitor
+ExecStart=/home/conor/dough-monitor/.venv/bin/python manage.py mqtt_listen
+# The listener reconnects to the broker by itself; this covers crashes and the database being down at boot.
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -134,6 +134,22 @@ In a second terminal start the MQTT listener. It runs until stopped and reconnec
 uv run python manage.py mqtt_listen
 ```
 
+### Running it as a service
+
+For an always-on install (a second Pi, or any Linux box on the LAN) `deploy/` has systemd units for the web app (gunicorn, static files via WhiteNoise) and the MQTT listener, plus an idempotent installer. On that machine:
+
+```
+sudo apt install postgresql                      # 16+; Debian 13 ships 17
+sudo -u postgres psql -c "CREATE ROLE dough_monitor WITH LOGIN CREATEDB PASSWORD '...';" \
+                      -c "CREATE DATABASE dough_monitor OWNER dough_monitor;"
+git clone https://github.com/conorcunningham/dough-monitor.git && cd dough-monitor
+cp .env.example .env                             # DJANGO_DEBUG=False, your hostname in DJANGO_ALLOWED_HOSTS,
+                                                 # MQTT_HOST pointing at the sensor Pi, a unique MQTT_CLIENT_ID
+deploy/install.sh
+```
+
+The app is then at `http://<host>:8000/`. Re-run `deploy/install.sh` after a `git pull` to roll out a new version; logs are in `journalctl -u dough-monitor-web -u dough-monitor-mqtt -f`. Create your admin user with `uv run python manage.py createsuperuser` in the checkout.
+
 ### Registering sensors
 
 Readings are only stored for sensors you have registered. When the listener hears one it does not know, it logs the ID once:
