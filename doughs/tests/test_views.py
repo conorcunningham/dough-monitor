@@ -141,6 +141,7 @@ class TimerActionTests(TestCase):
 
     def test_each_action_sets_its_timestamp(self):
         steps = [
+            ('start-mixing', 'mixed_at'),
             ('start-fermentation', 'fermentation_started_at'),
             ('stop-fermentation', 'fermentation_ended_at'),
             ('start-proofing', 'proofing_started_at'),
@@ -186,10 +187,50 @@ class TimerActionTests(TestCase):
 
         self.assertEqual(response.status_code, 405)
 
+    def test_stages_are_shown_in_order(self):
+        response = self.client.get(reverse('doughs:detail', args=[self.dough.pk]))
+
+        html = response.content.decode()
+        positions = [html.index(f'<strong>{stage}</strong>') for stage in ('Mixing', 'Folds', 'Fermentation', 'Shaping', 'Proofing', 'Bake')]
+        self.assertEqual(positions, sorted(positions))
+
     def test_start_shaping_asks_for_confirmation(self):
         response = self.client.get(reverse('doughs:detail', args=[self.dough.pk]))
 
         self.assertContains(response, 'hx-confirm="Stop collecting readings for this dough?"')
+
+
+class DeleteTests(TestCase):
+    def setUp(self):
+        self.dough = Dough.objects.create()
+        self.url = reverse('doughs:delete', args=[self.dough.pk])
+
+    def test_post_deletes_and_redirects_to_list(self):
+        Fold.objects.create(dough=self.dough)
+
+        response = self.client.post(self.url, follow=True)
+
+        self.assertRedirects(response, reverse('doughs:list'))
+        self.assertFalse(Dough.objects.exists())
+        self.assertFalse(Fold.objects.exists())
+        self.assertContains(response, 'Deleted Dough started')
+
+    def test_get_is_not_allowed(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 405)
+        self.assertTrue(Dough.objects.filter(pk=self.dough.pk).exists())
+
+    def test_missing_dough_is_404(self):
+        response = self.client.post(reverse('doughs:delete', args=[999]))
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_detail_page_has_confirmed_delete_button(self):
+        response = self.client.get(reverse('doughs:detail', args=[self.dough.pk]))
+
+        self.assertContains(response, 'Delete dough')
+        self.assertContains(response, f'action="{self.url}" onsubmit="return confirm(')
 
 
 class FoldViewTests(TestCase):

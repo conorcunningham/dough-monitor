@@ -1,12 +1,18 @@
+{# Stages in the order they happen: mixing, folds, fermentation, shaping, proofing. The bake follows in the form below. #}
 <section id="timers">
   {% if error %}<p class="message error" role="alert">{{ error }}</p>{% endif %}
 
   <div class="grid">
-    {% include 'doughs/partials/stage.html' with label='Fermentation' started_at=dough.fermentation_started_at ended_at=dough.fermentation_ended_at duration=dough.fermentation_duration start_action='start-fermentation' stop_action='stop-fermentation' %}
-    {% include 'doughs/partials/stage.html' with label='Proofing' started_at=dough.proofing_started_at ended_at=dough.proofing_ended_at duration=dough.proofing_duration start_action='start-proofing' stop_action='stop-proofing' %}
-  </div>
+    <article>
+      <header><strong>Mixing</strong></header>
+      {% if dough.mixed_at %}
+        <p>Mixed at {{ dough.mixed_at|date:'D j M, H:i' }}</p>
+      {% else %}
+        {% url 'doughs:timer' dough.pk 'start-mixing' as url %}
+        {% include 'doughs/partials/action.html' with label='Start mixing' %}
+      {% endif %}
+    </article>
 
-  <div class="grid">
     <article>
       <header><strong>Folds</strong></header>
       {% with folds=dough.folds.all %}
@@ -25,16 +31,23 @@
       {% url 'doughs:fold_add' dough.pk as url %}
       {% include 'doughs/partials/action.html' with label='Add fold' %}
     </article>
+  </div>
+
+  <div class="grid">
+    {% include 'doughs/partials/stage.html' with label='Fermentation' started_at=dough.fermentation_started_at ended_at=dough.fermentation_ended_at duration=dough.fermentation_duration start_action='start-fermentation' stop_action='stop-fermentation' %}
 
     <article>
-      <header><strong>Readings</strong></header>
+      <header><strong>Shaping</strong></header>
       {% if dough.is_collecting %}
-        <p>Collecting since {{ dough.started_at|time:'H:i' }}</p>
+        <p>Collecting readings since {{ dough.started_at|time:'H:i' }}</p>
         {% url 'doughs:timer' dough.pk 'start-shaping' as url %}
         {% include 'doughs/partials/action.html' with label='Start shaping' class='contrast' confirm='Stop collecting readings for this dough?' %}
       {% else %}
-        <p>Stopped at {{ dough.collection_ended_at|date:'D j M, H:i' }}</p>
+        <p>Shaped at {{ dough.collection_ended_at|date:'D j M, H:i' }}</p>
+        <small>Readings collection stopped.</small>
       {% endif %}
     </article>
+
+    {% include 'doughs/partials/stage.html' with label='Proofing' started_at=dough.proofing_started_at ended_at=dough.proofing_ended_at duration=dough.proofing_duration start_action='start-proofing' stop_action='stop-proofing' %}
   </div>
 </section>

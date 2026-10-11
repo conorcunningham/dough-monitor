@@ -28,6 +28,7 @@ Not all fields are mandatory at creation. Clicking "create" is enough.
 - Yeast (milligrams integer but displayed as grams)
 - Salt (grams)
 - Start time (now, on creation): readings collection starts
+- Mixed at: set by a "Start mixing" button when the flour and water are combined
 - Collection end: set by a "Start Shaping" (stop collection) button, or automatically when a new dough is created on the same dough sensor
 - Folds (one to many): a timestamp each
 - Fermentation: started/ended timestamps via start/stop buttons; duration (hours) is derived
@@ -38,6 +39,8 @@ Not all fields are mandatory at creation. Clicking "create" is enough.
 - Notes
 - Rating (1 - 5)
 - Rise (low, medium, full, excellent)
+
+Stages are shown in the order they happen: mixing, folds, fermentation, shaping, proofing, baking. A dough can be deleted from its page; its readings are left as strays.
 
 Hydration and salt % are derived for display, not stored.
 

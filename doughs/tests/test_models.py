@@ -190,6 +190,18 @@ class ButtonActionTests(TestCase):
     def setUp(self):
         self.dough = Dough.objects.create()
 
+    def test_start_mixing(self):
+        self.dough.start_mixing()
+
+        self.dough.refresh_from_db()
+        self.assertIsNotNone(self.dough.mixed_at)
+
+    def test_start_mixing_twice_is_rejected(self):
+        self.dough.start_mixing()
+
+        with self.assertRaisesMessage(ValidationError, 'Mixing has already started.'):
+            self.dough.start_mixing()
+
     def test_start_and_stop_fermentation(self):
         self.dough.start_fermentation()
         self.dough.stop_fermentation()

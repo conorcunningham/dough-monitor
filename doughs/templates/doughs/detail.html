@@ -29,4 +29,9 @@
 {% include 'doughs/partials/timers.html' %}
 
 {% include 'doughs/partials/form.html' %}
+
+<form method="post" action="{% url 'doughs:delete' dough.pk %}" onsubmit="return confirm('Delete this dough? Its readings will be left outside any collection window.')">
+  {% csrf_token %}
+  <button type="submit" class="outline secondary">Delete dough</button>
+</form>
 {% endblock %}

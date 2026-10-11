@@ -7,7 +7,7 @@ A Raspberry Pi reads two sensors and publishes them over MQTT:
 - a waterproof DS18B20 probe in the dough, wired to the Pi's GPIO
 - a cheap 433 MHz temperature/humidity sensor for the room, picked up by an RTL-SDR dongle and decoded by [rtl_433](https://github.com/merbanan/rtl_433)
 
-A Django app listens to the broker, stores the readings in Postgres and shows the current dough with a live chart. Folds, fermentation and proofing are recorded with buttons as they happen.
+A Django app listens to the broker, stores the readings in Postgres and shows the current dough with a live chart. Mixing, folds, fermentation, shaping and proofing are recorded with buttons as they happen.
 
 ```
 DS18B20 probe ─1-Wire─▶ ds18b20_publisher.py ─┐

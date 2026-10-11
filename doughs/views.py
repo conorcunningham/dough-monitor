@@ -10,6 +10,7 @@ from .models import Dough, Fold, stray_readings
 from sensors.models import Sensor
 
 TIMER_ACTIONS = {
+    'start-mixing': Dough.start_mixing,
     'start-fermentation': Dough.start_fermentation,
     'stop-fermentation': Dough.stop_fermentation,
     'start-proofing': Dough.start_proofing,
@@ -57,6 +58,14 @@ def dough_detail(request, pk):
     else:
         form = DoughForm(instance=dough)
     return render(request, 'doughs/detail.html', {'dough': dough, 'form': form})
+
+
+@require_POST
+def dough_delete(request, pk):
+    dough = get_object_or_404(Dough, pk=pk)
+    dough.delete()
+    messages.success(request, f'Deleted {dough}.')
+    return redirect('doughs:list')
 
 
 @require_POST

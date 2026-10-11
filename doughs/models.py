@@ -57,7 +57,8 @@ class Dough(models.Model):
     yeast_mg = models.PositiveIntegerField(null=True, blank=True)
     salt_g = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
 
-    # Recorded with start/stop buttons; durations are derived.
+    # Recorded with buttons as they happen; durations are derived.
+    mixed_at = models.DateTimeField(null=True, blank=True)
     fermentation_started_at = models.DateTimeField(null=True, blank=True)
     fermentation_ended_at = models.DateTimeField(null=True, blank=True)
     proofing_started_at = models.DateTimeField(null=True, blank=True)
@@ -182,6 +183,10 @@ class Dough(models.Model):
         return readings
 
     # Button actions
+
+    def start_mixing(self):
+        """Record when the flour and water were mixed."""
+        self._start('mixed_at', 'Mixing')
 
     def start_fermentation(self):
         self._start('fermentation_started_at', 'Fermentation')
