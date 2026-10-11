@@ -4,7 +4,7 @@ import paho.mqtt.client as mqtt
 from django.conf import settings
 from django.db import close_old_connections
 
-from .ingest import UnrecognisedMessage, parse_payload, store_reading
+from .ingest import UnrecognisedMessage, UnregisteredSensor, parse_payload, store_reading
 
 logger = logging.getLogger(__name__)
 
@@ -42,16 +42,21 @@ class Listener:
             logger.debug('Skipping message on %s: %s', topic, e)
             return None
 
-        reading = store_reading(parsed)
-        if reading is None and parsed.hardware_id not in self._reported_unknown:
-            # rtl_433 hears every 433 MHz device nearby, so unknown sensors are ignored, not added.
-            self._reported_unknown.add(parsed.hardware_id)
-            logger.info(
-                'Ignoring unregistered sensor %r on %s (%.1f °C). Add it in the admin to record it.',
-                parsed.hardware_id,
-                topic,
-                parsed.temperature_c,
-            )
+        try:
+            reading = store_reading(parsed)
+        except UnregisteredSensor:
+            if parsed.hardware_id not in self._reported_unknown:
+                # rtl_433 hears every 433 MHz device nearby, so unknown sensors are ignored, not added.
+                self._reported_unknown.add(parsed.hardware_id)
+                logger.info(
+                    'Ignoring unregistered sensor %r on %s (%.1f °C). Add it in the admin to record it.',
+                    parsed.hardware_id,
+                    topic,
+                    parsed.temperature_c,
+                )
+            return None
+        if reading is None:
+            logger.debug('No dough collecting from %r at %s; reading dropped.', parsed.hardware_id, parsed.recorded_at)
         return reading
 
 

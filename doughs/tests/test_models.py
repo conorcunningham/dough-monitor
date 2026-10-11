@@ -6,7 +6,7 @@ from django.db import IntegrityError
 from django.test import TestCase
 from django.utils import timezone
 
-from doughs.models import Dough, Fold
+from doughs.models import Dough, Fold, stray_readings
 from sensors.models import Reading, Sensor
 
 START = datetime(2026, 10, 6, 8, 0, tzinfo=UTC)
@@ -142,6 +142,48 @@ class CollectionWindowTests(TestCase):
     def test_collection_cannot_end_before_start(self):
         with self.assertRaises(IntegrityError):
             Dough.objects.create(started_at=START, collection_ended_at=START - timedelta(minutes=1))
+
+    def test_collecting_from_matches_dough_and_ambient_sensors_within_window(self):
+        open_dough = Dough.objects.create(dough_sensor=self.probe, ambient_sensor=self.kitchen, started_at=START)
+        closed = Dough.objects.create(
+            dough_sensor=self.other_probe,
+            started_at=START,
+            collection_ended_at=START + timedelta(hours=1),
+        )
+        at = START + timedelta(minutes=30)
+
+        self.assertQuerySetEqual(Dough.objects.collecting_from(self.probe, at=at), [open_dough])
+        self.assertQuerySetEqual(Dough.objects.collecting_from(self.kitchen, at=at), [open_dough])
+        self.assertQuerySetEqual(Dough.objects.collecting_from(self.other_probe, at=at), [closed])
+        self.assertFalse(Dough.objects.collecting_from(self.other_probe, at=closed.collection_ended_at).exists())
+        self.assertFalse(Dough.objects.collecting_from(self.probe, at=START - timedelta(seconds=1)).exists())
+
+    def test_stray_readings_are_those_outside_every_window(self):
+        Dough.objects.create(
+            dough_sensor=self.probe,
+            ambient_sensor=self.kitchen,
+            started_at=START,
+            collection_ended_at=START + timedelta(hours=1),
+        )
+        Dough.objects.create(dough_sensor=self.other_probe, started_at=START + timedelta(hours=2))
+        before = self.reading(self.probe, minutes=-1)
+        self.reading(self.probe, minutes=0)
+        self.reading(self.kitchen, minutes=59)
+        at_end = self.reading(self.probe, minutes=60)
+        ambient_late = self.reading(self.kitchen, minutes=90)
+        other_early = self.reading(self.other_probe, minutes=90)
+        self.reading(self.other_probe, minutes=120)
+        self.reading(self.other_probe, minutes=10_000)
+
+        self.assertQuerySetEqual(stray_readings(), [before, at_end, ambient_late, other_early], ordered=False)
+
+    def test_shared_ambient_sensor_is_covered_by_any_dough(self):
+        Dough.objects.create(dough_sensor=self.probe, ambient_sensor=self.kitchen, started_at=START, collection_ended_at=START + timedelta(hours=1))
+        Dough.objects.create(dough_sensor=self.other_probe, ambient_sensor=self.kitchen, started_at=START + timedelta(hours=1))
+        self.reading(self.kitchen, minutes=30)
+        self.reading(self.kitchen, minutes=90)
+
+        self.assertFalse(stray_readings().exists())
 
 
 class ButtonActionTests(TestCase):

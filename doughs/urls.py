@@ -14,4 +14,6 @@ urlpatterns = [
     path('doughs/<int:pk>/folds/<int:fold_pk>/delete/', views.fold_delete, name='fold_delete'),
     path('doughs/<int:pk>/latest/', views.latest_readings, name='latest'),
     path('doughs/<int:pk>/readings/', views.readings_data, name='readings'),
+    path('readings/', views.readings_overview, name='readings_overview'),
+    path('readings/prune/', views.readings_prune, name='readings_prune'),
 ]

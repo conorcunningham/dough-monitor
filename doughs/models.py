@@ -3,10 +3,21 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
-from django.db.models import F, Q
+from django.db.models import Exists, F, OuterRef, Q
 from django.utils import timezone
 
 from sensors.models import Reading, Sensor
+
+
+class DoughQuerySet(models.QuerySet):
+    def collecting_from(self, sensor, at):
+        """Doughs whose collection window contains ``at`` and that use ``sensor`` for dough or ambient."""
+        return self.filter(Q(dough_sensor=sensor) | Q(ambient_sensor=sensor)).within_window(at)
+
+    def within_window(self, at):
+        return self.filter(started_at__lte=at).filter(
+            Q(collection_ended_at__isnull=True) | Q(collection_ended_at__gt=at),
+        )
 
 
 class Dough(models.Model):
@@ -65,6 +76,8 @@ class Dough(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(5)],
     )
     rise = models.CharField(max_length=10, choices=Rise.choices, blank=True)
+
+    objects = DoughQuerySet.as_manager()
 
     class Meta:
         ordering = ['-started_at']
@@ -213,6 +226,18 @@ class Fold(models.Model):
 
     def __str__(self):
         return f'Fold @ {timezone.localtime(self.folded_at):%H:%M}'
+
+
+def stray_readings():
+    """Readings that no dough's collection window covers, for any sensor.
+
+    The listener only stores readings while a dough is collecting from the sensor, so these
+    come from before that rule existed, or from a dough being deleted.
+    """
+    covering = Dough.objects.filter(
+        Q(dough_sensor=OuterRef('sensor')) | Q(ambient_sensor=OuterRef('sensor')),
+    ).within_window(OuterRef('recorded_at'))
+    return Reading.objects.filter(~Exists(covering))
 
 
 def _only_sensor(kind):

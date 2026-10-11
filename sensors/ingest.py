@@ -24,10 +24,16 @@ from datetime import UTC, datetime, timedelta
 
 from django.utils import timezone
 
+from doughs.models import Dough
+
 from .models import Reading, Sensor
 
 
 class UnrecognisedMessage(ValueError):
+    pass
+
+
+class UnregisteredSensor(LookupError):
     pass
 
 
@@ -68,12 +74,16 @@ def parse_payload(payload):
 
 
 def store_reading(parsed):
-    """Save a reading for a registered sensor. Returns None if the sensor isn't registered.
+    """Save a reading for a registered sensor that a dough is collecting from.
 
+    Raises UnregisteredSensor for a sensor not in the admin. Returns None when no dough's
+    collection window covers the reading's time, so idle sensors don't fill the database.
     A repeat of a transmission (or a QoS 1 redelivery) returns the reading already stored.
     """
     sensor = Sensor.objects.filter(hardware_id=parsed.hardware_id).first()
     if sensor is None:
+        raise UnregisteredSensor(parsed.hardware_id)
+    if not Dough.objects.collecting_from(sensor, at=parsed.recorded_at).exists():
         return None
     repeat_of = (
         Reading.objects.filter(

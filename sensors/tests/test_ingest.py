@@ -6,7 +6,8 @@ from zoneinfo import ZoneInfo
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
-from sensors.ingest import ParsedReading, UnrecognisedMessage, parse_payload, store_reading
+from doughs.models import Dough
+from sensors.ingest import ParsedReading, UnrecognisedMessage, UnregisteredSensor, parse_payload, store_reading
 from sensors.models import Reading, Sensor
 
 
@@ -190,11 +191,17 @@ class StoreReadingTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.kitchen = Sensor.objects.create(hardware_id='Nexus-TH/1/42', name='Kitchen', kind=Sensor.Kind.AMBIENT)
+        cls.probe = Sensor.objects.create(hardware_id='28-0123456789ab', name='Probe', kind=Sensor.Kind.DOUGH)
         cls.parsed = ParsedReading(
             hardware_id='Nexus-TH/1/42',
             recorded_at=datetime(2026, 10, 6, 8, 0, tzinfo=UTC),
             temperature_c=21.3,
             humidity=55.0,
+        )
+        cls.dough = Dough.objects.create(
+            dough_sensor=cls.probe,
+            ambient_sensor=cls.kitchen,
+            started_at=cls.parsed.recorded_at - timedelta(hours=1),
         )
 
     def test_stores_reading_for_registered_sensor(self):
@@ -204,11 +211,44 @@ class StoreReadingTests(TestCase):
         self.assertEqual(reading.temperature_c, 21.3)
         self.assertEqual(reading.humidity, 55.0)
 
-    def test_ignores_unregistered_sensor(self):
-        reading = store_reading(ParsedReading('Nexus-TH/2/99', timezone.now(), 18.0))
+    def test_unregistered_sensor_is_rejected(self):
+        with self.assertRaises(UnregisteredSensor):
+            store_reading(ParsedReading('Nexus-TH/2/99', timezone.now(), 18.0))
+
+        self.assertFalse(Reading.objects.exists())
+
+    def test_stores_reading_for_dough_sensor(self):
+        reading = store_reading(replace(self.parsed, hardware_id=self.probe.hardware_id, humidity=None))
+
+        self.assertEqual(reading.sensor, self.probe)
+
+    def test_dropped_when_no_dough_is_collecting_from_sensor(self):
+        self.dough.dough_sensor = None
+        self.dough.save()
+        self.assertIsNone(store_reading(replace(self.parsed, hardware_id=self.probe.hardware_id)))
+
+        self.dough.collection_ended_at = self.parsed.recorded_at
+        self.dough.save()
+        self.assertIsNone(store_reading(self.parsed))
+        self.assertFalse(Reading.objects.exists())
+
+    def test_dropped_when_recorded_before_dough_started(self):
+        # The broker queues readings while we are offline, so the reading's own time counts, not now.
+        reading = store_reading(self._at(hours=-2))
 
         self.assertIsNone(reading)
         self.assertFalse(Reading.objects.exists())
+
+    def test_queued_reading_inside_a_closed_window_is_stored(self):
+        self.dough.collection_ended_at = self.parsed.recorded_at + timedelta(minutes=1)
+        self.dough.save()
+
+        self.assertIsNotNone(store_reading(self.parsed))
+
+    def test_stored_when_only_an_ambient_dough_uses_the_sensor(self):
+        Dough.objects.create(dough_sensor=self.probe, ambient_sensor=self.kitchen, started_at=self.parsed.recorded_at)
+
+        self.assertIsNotNone(store_reading(self.parsed))
 
     def test_redelivered_reading_is_stored_once(self):
         first = store_reading(self.parsed)

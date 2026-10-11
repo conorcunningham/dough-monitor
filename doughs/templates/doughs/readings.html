@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block title %}Readings · Dough Monitor{% endblock %}
+
+{% block content %}
+<hgroup>
+  <h1>Readings</h1>
+  <p>Readings are only stored while a dough is collecting from the sensor. Anything stored outside a dough's collection window is stray.</p>
+</hgroup>
+
+{% if sensors %}
+<div class="overflow-auto">
+  <table class="striped">
+    <thead>
+      <tr>
+        <th>Sensor</th>
+        <th>Kind</th>
+        <th>Readings</th>
+        <th>Stray</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sensor in sensors %}
+      <tr>
+        <td>{{ sensor.name }} <small>{{ sensor.hardware_id }}</small></td>
+        <td>{{ sensor.get_kind_display }}</td>
+        <td>{{ sensor.reading_count }}</td>
+        <td>{{ sensor.stray_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p>No sensors registered yet. Add them in the <a href="{% url 'admin:index' %}">admin</a>.</p>
+{% endif %}
+
+<article>
+  <header><strong>Housekeeping</strong></header>
+  {% if stray_count %}
+    <p>{{ stray_count }} reading{{ stray_count|pluralize }} fall{{ stray_count|pluralize:'s,' }} outside every dough's collection window.</p>
+    <form method="post" action="{% url 'doughs:readings_prune' %}" onsubmit="return confirm('Delete {{ stray_count }} stray reading{{ stray_count|pluralize }}? This cannot be undone.')">
+      {% csrf_token %}
+      <button type="submit" class="contrast">Delete stray readings</button>
+    </form>
+  {% else %}
+    <p>No stray readings.</p>
+  {% endif %}
+</article>
+{% endblock %}

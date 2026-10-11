@@ -1,11 +1,13 @@
 from django.contrib import messages
+from django.db.models import Count
 from django.core.exceptions import ValidationError
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
 from .forms import DoughForm
-from .models import Dough, Fold
+from .models import Dough, Fold, stray_readings
+from sensors.models import Sensor
 
 TIMER_ACTIONS = {
     'start-fermentation': Dough.start_fermentation,
@@ -113,3 +115,21 @@ def _timers_response(request, dough, error=None):
     if error:
         messages.error(request, error)
     return redirect('doughs:detail', pk=dough.pk)
+
+
+@require_GET
+def readings_overview(request):
+    stray = stray_readings()
+    sensors = Sensor.objects.annotate(reading_count=Count('readings')).order_by('kind', 'name')
+    stray_per_sensor = dict(stray.values_list('sensor_id').annotate(n=Count('id')).values_list('sensor_id', 'n'))
+    for sensor in sensors:
+        sensor.stray_count = stray_per_sensor.get(sensor.pk, 0)
+    return render(request, 'doughs/readings.html', {'sensors': sensors, 'stray_count': stray.count()})
+
+
+@require_POST
+def readings_prune(request):
+    """Delete every reading that falls outside all doughs' collection windows."""
+    deleted, _ = stray_readings().delete()
+    messages.success(request, f'Deleted {deleted} reading{"s" if deleted != 1 else ""} outside any dough\'s collection window.')
+    return redirect('doughs:readings_overview')

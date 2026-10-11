@@ -68,6 +68,7 @@ The data will be fetched using MQTT. MQTT is push-based, so this is a long-runni
 - Run it with `uv run python manage.py mqtt_listen` (code in `sensors/mqtt.py`, parsing in `sensors/ingest.py`).
 - Default topics: `dough-monitor/#` (our probe script) and `rtl_433/+/events` (rtl_433 JSON events). Payload formats are documented in `sensors/ingest.py`.
 - Readings from sensors not registered in the admin are ignored (rtl_433 hears the neighbours' devices too) and logged once.
+- Readings are only stored while a dough is collecting from the sensor (dough or ambient), judged by the reading's own `recorded_at`, so the broker's queued readings land in the right window. The "Readings" page (`/readings/`) counts stray readings outside every collection window and has a button to delete them (`doughs.models.stray_readings`).
 - The listener uses a fixed client ID with a persistent session and QoS 1, so the broker queues readings while it is offline.
 
 ## Hardware

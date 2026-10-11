@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 from io import StringIO
 from types import SimpleNamespace
 from unittest import mock
@@ -8,6 +9,7 @@ from django.test import TestCase, override_settings
 from paho.mqtt.packettypes import PacketTypes
 from paho.mqtt.reasoncodes import ReasonCode
 
+from doughs.models import Dough
 from sensors.models import Reading, Sensor
 from sensors.mqtt import Listener, build_client
 
@@ -43,7 +45,8 @@ class ListenerTests(TestCase):
         client.subscribe.assert_not_called()
 
     def test_message_from_registered_sensor_is_stored(self):
-        Sensor.objects.create(hardware_id='28-0123456789ab', name='Probe', kind=Sensor.Kind.DOUGH)
+        probe = Sensor.objects.create(hardware_id='28-0123456789ab', name='Probe', kind=Sensor.Kind.DOUGH)
+        Dough.objects.create(dough_sensor=probe, started_at=datetime(2026, 10, 6, 7, 0, tzinfo=UTC))
         message = SimpleNamespace(topic='dough-monitor/probe/28-0123456789ab', payload=PROBE_PAYLOAD)
 
         self.listener.on_message(None, None, message)
@@ -59,6 +62,18 @@ class ListenerTests(TestCase):
         self.assertEqual(len(logs.records), 1)
         self.assertIn("'28-0123456789ab'", logs.output[0])
         self.assertFalse(Reading.objects.exists())
+
+    def test_idle_sensor_reading_is_dropped_quietly(self):
+        Sensor.objects.create(hardware_id='28-0123456789ab', name='Probe', kind=Sensor.Kind.DOUGH)
+
+        with self.assertLogs('sensors.mqtt', 'DEBUG') as logs:
+            result = self.listener.handle('dough-monitor/probe/28-0123456789ab', PROBE_PAYLOAD)
+
+        self.assertIsNone(result)
+        self.assertFalse(Reading.objects.exists())
+        self.assertEqual(len(logs.records), 1)
+        self.assertEqual(logs.records[0].levelname, 'DEBUG')
+        self.assertIn('No dough collecting', logs.output[0])
 
     def test_unrecognised_message_is_skipped(self):
         with self.assertLogs('sensors.mqtt', 'DEBUG') as logs:

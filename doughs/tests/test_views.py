@@ -276,3 +276,47 @@ class ReadingsViewTests(TestCase):
         self.dough.start_shaping()
 
         self.assertNotContains(self.client.get(url), 'hx-trigger')
+
+
+class ReadingsOverviewTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.probe = Sensor.objects.create(hardware_id='28-0123456789ab', name='Probe', kind=Sensor.Kind.DOUGH)
+        start = datetime(2026, 10, 6, 8, 0, tzinfo=UTC)
+        Dough.objects.create(dough_sensor=cls.probe, started_at=start, collection_ended_at=start + timedelta(hours=1))
+        cls.inside = Reading.objects.create(sensor=cls.probe, recorded_at=start, temperature_c=24.0)
+        for minutes in (-10, 70):
+            Reading.objects.create(sensor=cls.probe, recorded_at=start + timedelta(minutes=minutes), temperature_c=24.0)
+
+    def test_page_shows_counts_and_delete_button(self):
+        response = self.client.get(reverse('doughs:readings_overview'))
+
+        self.assertContains(response, 'Probe')
+        self.assertContains(response, '2 readings fall outside')
+        self.assertContains(response, 'Delete stray readings')
+
+    def test_page_without_strays_has_no_button(self):
+        Reading.objects.exclude(pk=self.inside.pk).delete()
+
+        response = self.client.get(reverse('doughs:readings_overview'))
+
+        self.assertContains(response, 'No stray readings')
+        self.assertNotContains(response, 'Delete stray readings')
+
+    def test_prune_deletes_only_stray_readings(self):
+        response = self.client.post(reverse('doughs:readings_prune'), follow=True)
+
+        self.assertRedirects(response, reverse('doughs:readings_overview'))
+        self.assertQuerySetEqual(Reading.objects.all(), [self.inside])
+        self.assertContains(response, 'Deleted 2 readings')
+
+    def test_prune_requires_post(self):
+        response = self.client.get(reverse('doughs:readings_prune'))
+
+        self.assertEqual(response.status_code, 405)
+        self.assertEqual(Reading.objects.count(), 3)
+
+    def test_nav_links_to_readings_page(self):
+        response = self.client.get(reverse('doughs:list'))
+
+        self.assertContains(response, reverse('doughs:readings_overview'))
