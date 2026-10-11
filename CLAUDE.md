@@ -55,6 +55,7 @@ HTMX will do the GUI, we don't need to go full React or Vue here. The main view 
 - htmx, Chart.js and Pico CSS are vendored in `static/vendor/` (versions in the file names) so the app works on a LAN without CDN access.
 - Action buttons are real `<form method="post">`s with `hx-post`: htmx requests get a partial back, plain posts redirect.
 - Run the web app with `uv run python manage.py runserver`.
+- Production: `deploy/install.sh` installs systemd units for gunicorn (bound to 127.0.0.1:8000) and the MQTT listener; `sudo deploy/install-tls.sh HOST EMAIL` puts Caddy in front with a Let's Encrypt cert from lego (DNS-01 via Domeneshop). Update = `git pull && deploy/install.sh`.
 
 ## Database
 Postgres 16+

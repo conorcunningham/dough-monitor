@@ -33,6 +33,15 @@ DEBUG = env.bool('DJANGO_DEBUG', default=False)
 
 ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=[])
 
+# The app runs behind a TLS-terminating proxy (Caddy via deploy/install-tls.sh, or Dokku's nginx)
+# with gunicorn bound to localhost, so the proxy's X-Forwarded-Proto header can be trusted.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+# Origins allowed to POST, e.g. https://levain.example.com; only needed when the proxy's
+# public hostname differs from the Host header it forwards.
+CSRF_TRUSTED_ORIGINS = env.list('DJANGO_CSRF_TRUSTED_ORIGINS', default=[])
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
 
 # Application definition
 

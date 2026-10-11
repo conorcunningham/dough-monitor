@@ -148,7 +148,29 @@ cp .env.example .env                             # DJANGO_DEBUG=False, your host
 deploy/install.sh
 ```
 
-The app is then at `http://<host>:8000/`. Re-run `deploy/install.sh` after a `git pull` to roll out a new version; logs are in `journalctl -u dough-monitor-web -u dough-monitor-mqtt -f`. Create your admin user with `uv run python manage.py createsuperuser` in the checkout.
+Gunicorn listens on `127.0.0.1:8000` only; HTTPS is added below. Re-run `deploy/install.sh` after a `git pull` to roll out a new version; logs are in `journalctl -u dough-monitor-web -u dough-monitor-mqtt -f`. Create your admin user with `uv run python manage.py createsuperuser` in the checkout.
+
+### HTTPS with a real certificate
+
+[Caddy](https://caddyserver.com/) sits in front of gunicorn as the web server and TLS terminator, and [lego](https://go-acme.github.io/lego/) obtains and renews a Let's Encrypt certificate using a DNS-01 challenge against the [Domeneshop](https://domene.shop/) API. DNS-01 only needs a public TXT record, so the box can stay on the LAN; the hostname itself only has to resolve locally (Pi-hole, `/etc/hosts`, ...). If your DNS is elsewhere, swap `domeneshop` in `deploy/lego-renew.service` for one of lego's other providers.
+
+1. Create an API key and secret in the Domeneshop control panel (`https://www.domeneshop.no/admin?view=api`) and store them on the server, readable by root only:
+
+   ```
+   sudo mkdir -p /etc/caddy
+   sudo nano /etc/caddy/domeneshop.env     # DOMENESHOP_API_TOKEN=... and DOMENESHOP_API_SECRET=...
+   sudo chmod 600 /etc/caddy/domeneshop.env
+   ```
+
+2. Add the hostname to `DJANGO_ALLOWED_HOSTS` and set `DJANGO_CSRF_TRUSTED_ORIGINS=https://<hostname>` in `.env`, then re-run `deploy/install.sh`.
+
+3. Install Caddy and lego, fetch the certificate and start the daily renewal timer:
+
+   ```
+   sudo deploy/install-tls.sh <hostname> <your email for Let's Encrypt notices>
+   ```
+
+The app is then at `https://<hostname>/`, with HTTP redirected to HTTPS. The certificate lives in `/var/lib/lego` and is copied to `/etc/caddy/certs/` by `deploy/lego-deploy-hook.sh`, which also reloads Caddy; `systemctl list-timers lego-renew.timer` shows the next renewal check and `journalctl -u lego-renew -u caddy` the logs. Re-running `deploy/install-tls.sh` is safe and picks up changes to the Caddyfile or units.
 
 ### Registering sensors
 

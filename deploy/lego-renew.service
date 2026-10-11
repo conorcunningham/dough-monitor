@@ -1,0 +1,20 @@
+# Renews the Dough Monitor TLS certificate. `lego run` only renews when fewer than --renew-days
+# remain, so it is safe to run daily (see lego-renew.timer). Installed by deploy/install-tls.sh,
+# which fills in __HOST__ and __EMAIL__.
+# The Domeneshop API credentials are read from /etc/caddy/domeneshop.env (root only).
+# DNS checks are skipped (--dns.propagation.wait) because the LAN resolver answers for the
+# domain itself and would never see the public TXT record.
+[Unit]
+Description=Dough Monitor TLS certificate renewal (lego)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/lego run \
+    --path /var/lib/lego --env-file /etc/caddy/domeneshop.env \
+    --email __EMAIL__ --accept-tos \
+    --domains __HOST__ \
+    --dns domeneshop --dns.propagation.wait 90s \
+    --renew-days 30 \
+    --deploy-hook /usr/local/lib/dough-monitor/lego-deploy-hook.sh

@@ -39,5 +39,5 @@ sudo systemctl restart dough-monitor-web dough-monitor-mqtt
 step "Status"
 systemctl --no-pager --lines=0 status dough-monitor-web dough-monitor-mqtt | grep -E "●|Active:"
 echo
-echo "Web app: http://$(hostname -f 2>/dev/null || hostname):8000/"
+echo "Web app: http://127.0.0.1:8000/ on this machine; run sudo deploy/install-tls.sh for HTTPS."
 echo "Logs:    journalctl -u dough-monitor-web -u dough-monitor-mqtt -f"

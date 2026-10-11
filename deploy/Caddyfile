@@ -1,0 +1,9 @@
+# Dough Monitor: Caddy terminates TLS in front of gunicorn on 127.0.0.1:8000.
+# deploy/install-tls.sh fills in __HOST__ and installs this as /etc/caddy/Caddyfile.
+# The certificate files are maintained by lego (see deploy/lego-renew.service); Caddy
+# does not request certificates itself because the host is not reachable from the internet.
+__HOST__ {
+	tls /etc/caddy/certs/__HOST__.crt /etc/caddy/certs/__HOST__.key
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8000
+}
