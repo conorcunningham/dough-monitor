@@ -27,10 +27,16 @@ step() { printf '\n==> %s\n' "$*"; }
 
 [[ $EUID -eq 0 ]] || { echo "Run with sudo." >&2; exit 1; }
 
-step "Installing Caddy"
-if ! command -v caddy >/dev/null; then
-    apt-get install -y caddy
-fi
+step "Installing Caddy and stubby"
+# stubby is a DNS-over-TLS stub resolver on 127.0.0.1:53. lego uses it to work out which zone
+# the hostname belongs to, because a LAN resolver that answers for the domain itself (Pi-hole
+# with a local search domain) hides the public SOA/NS records, and some routers intercept all
+# port 53 traffic so pointing lego at 1.1.1.1 directly does not help either.
+apt-get install -y caddy stubby
+# /etc/caddy may pre-exist with mode 700 (created by hand for domeneshop.env); Caddy runs as
+# its own user and must be able to read the Caddyfile.
+chmod 755 /etc/caddy
+systemctl enable --now stubby
 caddy version
 
 step "Checking Domeneshop credentials in $creds"

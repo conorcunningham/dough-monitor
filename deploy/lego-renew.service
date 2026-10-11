@@ -2,8 +2,9 @@
 # remain, so it is safe to run daily (see lego-renew.timer). Installed by deploy/install-tls.sh,
 # which fills in __HOST__ and __EMAIL__.
 # The Domeneshop API credentials are read from /etc/caddy/domeneshop.env (root only).
-# DNS checks are skipped (--dns.propagation.wait) because the LAN resolver answers for the
-# domain itself and would never see the public TXT record.
+# Zone lookups go through stubby (DNS-over-TLS on 127.0.0.1) so lego sees the public view of
+# the domain; propagation checks are replaced by a fixed wait because the authoritative servers
+# are only reachable on port 53, which the LAN resolver intercepts.
 [Unit]
 Description=Dough Monitor TLS certificate renewal (lego)
 After=network-online.target
@@ -15,6 +16,6 @@ ExecStart=/usr/local/bin/lego run \
     --path /var/lib/lego --env-file /etc/caddy/domeneshop.env \
     --email __EMAIL__ --accept-tos \
     --domains __HOST__ \
-    --dns domeneshop --dns.propagation.wait 90s \
+    --dns domeneshop --dns.resolvers 127.0.0.1:53 --dns.propagation.wait 90s \
     --renew-days 30 \
     --deploy-hook /usr/local/lib/dough-monitor/lego-deploy-hook.sh

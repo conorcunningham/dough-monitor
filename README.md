@@ -164,7 +164,7 @@ Gunicorn listens on `127.0.0.1:8000` only; HTTPS is added below. Re-run `deploy/
 
 2. Add the hostname to `DJANGO_ALLOWED_HOSTS` and set `DJANGO_CSRF_TRUSTED_ORIGINS=https://<hostname>` in `.env`, then re-run `deploy/install.sh`.
 
-3. Install Caddy and lego, fetch the certificate and start the daily renewal timer:
+3. Install Caddy, lego and stubby (a DNS-over-TLS stub so lego can see the public DNS even when the LAN resolver claims the domain), fetch the certificate and start the daily renewal timer:
 
    ```
    sudo deploy/install-tls.sh <hostname> <your email for Let's Encrypt notices>
