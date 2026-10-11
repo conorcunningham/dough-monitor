@@ -15,7 +15,7 @@ class DoughQuerySet(models.QuerySet):
         return self.filter(Q(dough_sensor=sensor) | Q(ambient_sensor=sensor)).within_window(at)
 
     def within_window(self, at):
-        return self.filter(started_at__lte=at).filter(
+        return self.filter(fermentation_started_at__lte=at).filter(
             Q(collection_ended_at__isnull=True) | Q(collection_ended_at__gt=at),
         )
 
@@ -27,8 +27,8 @@ class Dough(models.Model):
         FULL = 'full', 'Full'
         EXCELLENT = 'excellent', 'Excellent'
 
-    # Readings collection window. Collection stops at "Start Shaping", or
-    # automatically when a new dough is started on the same dough sensor.
+    # Readings collection window: from "Start Fermentation" until "Start Shaping", or
+    # until a new dough is started on the same dough sensor.
     started_at = models.DateTimeField(default=timezone.now)
     collection_ended_at = models.DateTimeField(null=True, blank=True)
 
@@ -164,7 +164,7 @@ class Dough(models.Model):
 
     @property
     def is_collecting(self):
-        return self.collection_ended_at is None
+        return self.fermentation_started_at is not None and self.collection_ended_at is None
 
     # Readings
 
@@ -177,7 +177,9 @@ class Dough(models.Model):
     def _readings_for(self, sensor_id):
         if sensor_id is None:
             return Reading.objects.none()
-        readings = Reading.objects.filter(sensor_id=sensor_id, recorded_at__gte=self.started_at)
+        if self.fermentation_started_at is None:
+            return Reading.objects.none()
+        readings = Reading.objects.filter(sensor_id=sensor_id, recorded_at__gte=self.fermentation_started_at)
         if self.collection_ended_at is not None:
             readings = readings.filter(recorded_at__lt=self.collection_ended_at)
         return readings
@@ -189,6 +191,9 @@ class Dough(models.Model):
         self._start('mixed_at', 'Mixing')
 
     def start_fermentation(self):
+        """Start collecting readings for this dough."""
+        if self.collection_ended_at is not None:
+            raise ValidationError('Collection has already stopped.')
         self._start('fermentation_started_at', 'Fermentation')
 
     def stop_fermentation(self):
@@ -202,6 +207,8 @@ class Dough(models.Model):
 
     def start_shaping(self):
         """Stop collecting readings for this dough."""
+        if self.fermentation_started_at is None:
+            raise ValidationError('Fermentation has not started.')
         if self.collection_ended_at is not None:
             raise ValidationError('Collection has already stopped.')
         self.collection_ended_at = timezone.now()

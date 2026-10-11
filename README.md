@@ -182,7 +182,7 @@ INFO sensors.mqtt: Ignoring unregistered sensor 'Nexus-TH/1/42' on rtl_433/raspb
 
 Add it at `http://localhost:8000/admin/sensors/sensor/` with that hardware ID, a name and a kind (ambient for the room sensor, dough for the probe). No restart needed. If a battery change gives a 433 MHz sensor a new ID, edit the hardware ID on the existing sensor rather than creating a new one, so its history stays attached.
 
-Registering a sensor is not enough on its own: a reading is only stored while a dough is collecting from that sensor (as its dough or ambient sensor), judged by the reading's own timestamp so readings the broker queued overnight still land in the right window. Between doughs the listener drops readings and says so at DEBUG level. The **Readings** page in the nav shows how many readings each sensor has, how many fall outside every dough's collection window (from before this rule, or from a deleted dough), and a button to delete those stray readings.
+Registering a sensor is not enough on its own: a reading is only stored while a dough is collecting from that sensor (as its dough or ambient sensor, from "Start fermentation" until "Start shaping"), judged by the reading's own timestamp so readings the broker queued overnight still land in the right window. Between doughs the listener drops readings and says so at DEBUG level. The **Readings** page in the nav shows how many readings each sensor has, how many fall outside every dough's collection window (from before this rule, or from a deleted dough), and a button to delete those stray readings.
 
 ### Smoke test without the hardware
 

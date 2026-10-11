@@ -13,9 +13,13 @@
   <h1>{{ dough }}</h1>
   <p>
     {% if dough.is_collecting %}
-      Collecting readings since {{ dough.started_at|time:'H:i' }}
+      Collecting readings since {{ dough.fermentation_started_at|time:'H:i' }}
+    {% elif dough.fermentation_started_at %}
+      Collected {{ dough.fermentation_started_at|date:'D j M, H:i' }} – {{ dough.collection_ended_at|date:'D j M, H:i' }}
+    {% elif dough.collection_ended_at %}
+      No readings: fermentation never started
     {% else %}
-      Collected {{ dough.started_at|date:'D j M, H:i' }} – {{ dough.collection_ended_at|date:'D j M, H:i' }}
+      Readings are collected from “Start fermentation”
     {% endif %}
   </p>
 </hgroup>

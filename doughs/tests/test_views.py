@@ -195,9 +195,18 @@ class TimerActionTests(TestCase):
         self.assertEqual(positions, sorted(positions))
 
     def test_start_shaping_asks_for_confirmation(self):
+        self.dough.start_fermentation()
+
         response = self.client.get(reverse('doughs:detail', args=[self.dough.pk]))
 
         self.assertContains(response, 'hx-confirm="Stop collecting readings for this dough?"')
+
+    def test_shaping_waits_for_fermentation(self):
+        response = self.client.get(reverse('doughs:detail', args=[self.dough.pk]))
+
+        self.assertContains(response, 'Start fermentation first.')
+        self.assertNotContains(response, 'Start shaping')
+        self.assertContains(response, 'Readings are collected from “Start fermentation”')
 
 
 class DeleteTests(TestCase):
@@ -267,7 +276,7 @@ class ReadingsViewTests(TestCase):
 
     def setUp(self):
         self.start = timezone.now() - timedelta(hours=1)
-        self.dough = Dough.objects.create(dough_sensor=self.probe, ambient_sensor=self.kitchen, started_at=self.start)
+        self.dough = Dough.objects.create(dough_sensor=self.probe, ambient_sensor=self.kitchen, started_at=self.start, fermentation_started_at=self.start)
 
     def reading(self, sensor, recorded_at, temperature_c, humidity=None):
         return Reading.objects.create(
@@ -318,13 +327,19 @@ class ReadingsViewTests(TestCase):
 
         self.assertNotContains(self.client.get(url), 'hx-trigger')
 
+    def test_chart_and_latest_exclude_readings_before_fermentation(self):
+        self.reading(self.probe, self.start - timedelta(minutes=1), 30.0)
+
+        self.assertEqual(self.client.get(reverse('doughs:readings', args=[self.dough.pk])).json()['dough'], [])
+        self.assertContains(self.client.get(reverse('doughs:latest', args=[self.dough.pk])), 'No readings yet.')
+
 
 class ReadingsOverviewTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.probe = Sensor.objects.create(hardware_id='28-0123456789ab', name='Probe', kind=Sensor.Kind.DOUGH)
         start = datetime(2026, 10, 6, 8, 0, tzinfo=UTC)
-        Dough.objects.create(dough_sensor=cls.probe, started_at=start, collection_ended_at=start + timedelta(hours=1))
+        Dough.objects.create(dough_sensor=cls.probe, started_at=start, fermentation_started_at=start, collection_ended_at=start + timedelta(hours=1))
         cls.inside = Reading.objects.create(sensor=cls.probe, recorded_at=start, temperature_c=24.0)
         for minutes in (-10, 70):
             Reading.objects.create(sensor=cls.probe, recorded_at=start + timedelta(minutes=minutes), temperature_c=24.0)

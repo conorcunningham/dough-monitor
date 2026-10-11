@@ -27,11 +27,12 @@ Not all fields are mandatory at creation. Clicking "create" is enough.
 - Water Temperature (Celsius)
 - Yeast (milligrams integer but displayed as grams)
 - Salt (grams)
-- Start time (now, on creation): readings collection starts
+- Start time (now, on creation)
 - Mixed at: set by a "Start mixing" button when the flour and water are combined
+- Collection start: "Start Fermentation" (readings before it are not stored)
 - Collection end: set by a "Start Shaping" (stop collection) button, or automatically when a new dough is created on the same dough sensor
 - Folds (one to many): a timestamp each
-- Fermentation: started/ended timestamps via start/stop buttons; duration (hours) is derived
+- Fermentation: started/ended timestamps via start/stop buttons; duration (hours) is derived. Collection continues after fermentation stops, until shaping.
 - Proofing: started/ended timestamps via start/stop buttons; duration (minutes) is derived
 - Baking temp: pre-planned, default 250 C
 - Lid on dutch oven duration: pre-planned, default 30 minutes

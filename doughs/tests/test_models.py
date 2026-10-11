@@ -19,6 +19,13 @@ class DoughCreationTests(TestCase):
         dough = Dough.objects.create()
 
         self.assertGreaterEqual(dough.started_at, before)
+        self.assertFalse(dough.is_collecting)
+
+    def test_collecting_starts_with_fermentation(self):
+        dough = Dough.objects.create()
+
+        dough.start_fermentation()
+
         self.assertTrue(dough.is_collecting)
 
     def test_bake_defaults(self):
@@ -84,29 +91,29 @@ class CollectionWindowTests(TestCase):
         )
 
     def test_new_dough_closes_open_dough_on_same_sensor(self):
-        first = Dough.objects.create(dough_sensor=self.probe, started_at=START)
-        second = Dough.objects.create(dough_sensor=self.probe, started_at=START + timedelta(days=1))
+        first = Dough.objects.create(dough_sensor=self.probe, started_at=START, fermentation_started_at=START)
+        second = Dough.objects.create(dough_sensor=self.probe, started_at=START + timedelta(days=1), fermentation_started_at=START + timedelta(days=1))
 
         first.refresh_from_db()
         self.assertEqual(first.collection_ended_at, second.started_at)
         self.assertTrue(second.is_collecting)
 
     def test_new_dough_leaves_doughs_on_other_sensors_open(self):
-        first = Dough.objects.create(dough_sensor=self.probe, started_at=START)
-        Dough.objects.create(dough_sensor=self.other_probe, started_at=START + timedelta(hours=1))
+        first = Dough.objects.create(dough_sensor=self.probe, started_at=START, fermentation_started_at=START)
+        Dough.objects.create(dough_sensor=self.other_probe, started_at=START + timedelta(hours=1), fermentation_started_at=START + timedelta(hours=1))
 
         first.refresh_from_db()
         self.assertTrue(first.is_collecting)
 
     def test_database_allows_only_one_collecting_dough_per_sensor(self):
-        Dough.objects.create(dough_sensor=self.probe, started_at=START)
+        Dough.objects.create(dough_sensor=self.probe, started_at=START, fermentation_started_at=START)
 
         with self.assertRaises(IntegrityError):
             # bulk_create bypasses save(), so nothing closes the first dough.
-            Dough.objects.bulk_create([Dough(dough_sensor=self.probe, started_at=START)])
+            Dough.objects.bulk_create([Dough(dough_sensor=self.probe, started_at=START, fermentation_started_at=START)])
 
     def test_dough_readings_are_its_sensors_readings_since_start(self):
-        dough = Dough.objects.create(dough_sensor=self.probe, ambient_sensor=self.kitchen, started_at=START)
+        dough = Dough.objects.create(dough_sensor=self.probe, ambient_sensor=self.kitchen, started_at=START, fermentation_started_at=START)
         self.reading(self.probe, minutes=-1)
         inside = self.reading(self.probe, minutes=0)
         self.reading(self.other_probe, minutes=5)
@@ -118,7 +125,7 @@ class CollectionWindowTests(TestCase):
     def test_readings_stop_at_collection_end(self):
         dough = Dough.objects.create(
             dough_sensor=self.probe,
-            started_at=START,
+            started_at=START, fermentation_started_at=START,
             collection_ended_at=START + timedelta(hours=1),
         )
         inside = self.reading(self.probe, minutes=59)
@@ -127,8 +134,8 @@ class CollectionWindowTests(TestCase):
         self.assertQuerySetEqual(dough.dough_readings(), [inside])
 
     def test_ambient_sensor_can_be_shared(self):
-        first = Dough.objects.create(dough_sensor=self.probe, ambient_sensor=self.kitchen, started_at=START)
-        second = Dough.objects.create(dough_sensor=self.other_probe, ambient_sensor=self.kitchen, started_at=START)
+        first = Dough.objects.create(dough_sensor=self.probe, ambient_sensor=self.kitchen, started_at=START, fermentation_started_at=START)
+        second = Dough.objects.create(dough_sensor=self.other_probe, ambient_sensor=self.kitchen, started_at=START, fermentation_started_at=START)
         reading = self.reading(self.kitchen, minutes=5)
 
         self.assertQuerySetEqual(first.ambient_readings(), [reading])
@@ -137,17 +144,17 @@ class CollectionWindowTests(TestCase):
     def test_no_sensor_means_no_readings(self):
         self.reading(self.probe, minutes=5)
 
-        self.assertQuerySetEqual(Dough.objects.create(started_at=START).dough_readings(), [])
+        self.assertQuerySetEqual(Dough.objects.create(started_at=START, fermentation_started_at=START).dough_readings(), [])
 
     def test_collection_cannot_end_before_start(self):
         with self.assertRaises(IntegrityError):
-            Dough.objects.create(started_at=START, collection_ended_at=START - timedelta(minutes=1))
+            Dough.objects.create(started_at=START, fermentation_started_at=START, collection_ended_at=START - timedelta(minutes=1))
 
     def test_collecting_from_matches_dough_and_ambient_sensors_within_window(self):
-        open_dough = Dough.objects.create(dough_sensor=self.probe, ambient_sensor=self.kitchen, started_at=START)
+        open_dough = Dough.objects.create(dough_sensor=self.probe, ambient_sensor=self.kitchen, started_at=START, fermentation_started_at=START)
         closed = Dough.objects.create(
             dough_sensor=self.other_probe,
-            started_at=START,
+            started_at=START, fermentation_started_at=START,
             collection_ended_at=START + timedelta(hours=1),
         )
         at = START + timedelta(minutes=30)
@@ -162,10 +169,10 @@ class CollectionWindowTests(TestCase):
         Dough.objects.create(
             dough_sensor=self.probe,
             ambient_sensor=self.kitchen,
-            started_at=START,
+            started_at=START, fermentation_started_at=START,
             collection_ended_at=START + timedelta(hours=1),
         )
-        Dough.objects.create(dough_sensor=self.other_probe, started_at=START + timedelta(hours=2))
+        Dough.objects.create(dough_sensor=self.other_probe, started_at=START + timedelta(hours=2), fermentation_started_at=START + timedelta(hours=2))
         before = self.reading(self.probe, minutes=-1)
         self.reading(self.probe, minutes=0)
         self.reading(self.kitchen, minutes=59)
@@ -178,8 +185,8 @@ class CollectionWindowTests(TestCase):
         self.assertQuerySetEqual(stray_readings(), [before, at_end, ambient_late, other_early], ordered=False)
 
     def test_shared_ambient_sensor_is_covered_by_any_dough(self):
-        Dough.objects.create(dough_sensor=self.probe, ambient_sensor=self.kitchen, started_at=START, collection_ended_at=START + timedelta(hours=1))
-        Dough.objects.create(dough_sensor=self.other_probe, ambient_sensor=self.kitchen, started_at=START + timedelta(hours=1))
+        Dough.objects.create(dough_sensor=self.probe, ambient_sensor=self.kitchen, started_at=START, fermentation_started_at=START, collection_ended_at=START + timedelta(hours=1))
+        Dough.objects.create(dough_sensor=self.other_probe, ambient_sensor=self.kitchen, started_at=START + timedelta(hours=1), fermentation_started_at=START + timedelta(hours=1))
         self.reading(self.kitchen, minutes=30)
         self.reading(self.kitchen, minutes=90)
 
@@ -237,16 +244,31 @@ class ButtonActionTests(TestCase):
             self.dough.stop_fermentation()
 
     def test_start_shaping_stops_collection(self):
+        self.dough.start_fermentation()
         self.dough.start_shaping()
 
         self.dough.refresh_from_db()
         self.assertFalse(self.dough.is_collecting)
+        self.assertIsNotNone(self.dough.collection_ended_at)
+
+    def test_start_shaping_before_fermentation_is_rejected(self):
+        with self.assertRaisesMessage(ValidationError, 'Fermentation has not started.'):
+            self.dough.start_shaping()
 
     def test_start_shaping_twice_is_rejected(self):
+        self.dough.start_fermentation()
         self.dough.start_shaping()
 
         with self.assertRaisesMessage(ValidationError, 'already stopped'):
             self.dough.start_shaping()
+
+    def test_fermentation_cannot_start_after_collection_stopped(self):
+        # A new dough on the same sensor closes this one before it ever fermented.
+        self.dough.collection_ended_at = timezone.now()
+        self.dough.save()
+
+        with self.assertRaisesMessage(ValidationError, 'Collection has already stopped.'):
+            self.dough.start_fermentation()
 
     def test_fermentation_end_without_start_is_rejected_by_database(self):
         with self.assertRaises(IntegrityError):

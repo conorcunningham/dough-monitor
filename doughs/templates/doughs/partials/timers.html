@@ -39,12 +39,14 @@
     <article>
       <header><strong>Shaping</strong></header>
       {% if dough.is_collecting %}
-        <p>Collecting readings since {{ dough.started_at|time:'H:i' }}</p>
+        <p>Collecting readings since {{ dough.fermentation_started_at|time:'H:i' }}</p>
         {% url 'doughs:timer' dough.pk 'start-shaping' as url %}
         {% include 'doughs/partials/action.html' with label='Start shaping' class='contrast' confirm='Stop collecting readings for this dough?' %}
-      {% else %}
+      {% elif dough.collection_ended_at %}
         <p>Shaped at {{ dough.collection_ended_at|date:'D j M, H:i' }}</p>
         <small>Readings collection stopped.</small>
+      {% else %}
+        <p>Start fermentation first.</p>
       {% endif %}
     </article>
 

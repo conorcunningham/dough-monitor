@@ -201,7 +201,7 @@ class StoreReadingTests(TestCase):
         cls.dough = Dough.objects.create(
             dough_sensor=cls.probe,
             ambient_sensor=cls.kitchen,
-            started_at=cls.parsed.recorded_at - timedelta(hours=1),
+            started_at=cls.parsed.recorded_at - timedelta(hours=1), fermentation_started_at=cls.parsed.recorded_at - timedelta(hours=1),
         )
 
     def test_stores_reading_for_registered_sensor(self):
@@ -246,7 +246,7 @@ class StoreReadingTests(TestCase):
         self.assertIsNotNone(store_reading(self.parsed))
 
     def test_stored_when_only_an_ambient_dough_uses_the_sensor(self):
-        Dough.objects.create(dough_sensor=self.probe, ambient_sensor=self.kitchen, started_at=self.parsed.recorded_at)
+        Dough.objects.create(dough_sensor=self.probe, ambient_sensor=self.kitchen, started_at=self.parsed.recorded_at, fermentation_started_at=self.parsed.recorded_at)
 
         self.assertIsNotNone(store_reading(self.parsed))
 

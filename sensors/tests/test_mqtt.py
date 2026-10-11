@@ -46,7 +46,7 @@ class ListenerTests(TestCase):
 
     def test_message_from_registered_sensor_is_stored(self):
         probe = Sensor.objects.create(hardware_id='28-0123456789ab', name='Probe', kind=Sensor.Kind.DOUGH)
-        Dough.objects.create(dough_sensor=probe, started_at=datetime(2026, 10, 6, 7, 0, tzinfo=UTC))
+        Dough.objects.create(dough_sensor=probe, started_at=datetime(2026, 10, 6, 7, 0, tzinfo=UTC), fermentation_started_at=datetime(2026, 10, 6, 7, 0, tzinfo=UTC))
         message = SimpleNamespace(topic='dough-monitor/probe/28-0123456789ab', payload=PROBE_PAYLOAD)
 
         self.listener.on_message(None, None, message)
