@@ -108,6 +108,13 @@ else
         fi
     done
     ((found)) || fail "no DS18B20 on the bus (check the wiring; the bus rescans every 10 s)"
+    # A lead with intermittent contact shows up as garbage ROM IDs during bus searches
+    # and as failed CRC checks in the publisher, long before the probe disappears for good.
+    phantoms=$(journalctl -k -b -o cat --no-pager 2>/dev/null | grep -c 'Family 0 for 00\.')
+    crc_failures=$(journalctl -u dough-probe -b -o cat --no-pager 2>/dev/null | grep -c 'CRC check failed')
+    if ((phantoms > 0 || crc_failures > 0)); then
+        warn "intermittent probe contact since boot: $phantoms phantom bus devices, $crc_failures failed reads (reseat or solder the leads)"
+    fi
 fi
 
 tmp=$(mktemp -d)
