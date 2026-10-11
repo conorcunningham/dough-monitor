@@ -72,9 +72,17 @@ install -m 644 deploy/lego-renew.timer /etc/systemd/system/lego-renew.timer
 systemctl daemon-reload
 systemctl enable --now lego-renew.timer
 
+cert_store=/var/lib/lego/certificates
 if [[ ! -f /etc/caddy/certs/$host.crt ]]; then
-    step "Obtaining the first certificate for $host (DNS-01 via Domeneshop)"
-    systemctl start lego-renew.service
+    if [[ -f $cert_store/$host.crt ]]; then
+        # Issued earlier but never handed to Caddy (say the hook failed): no need to ask the CA again.
+        step "Installing the existing certificate for Caddy"
+        LEGO_HOOK_CERT_NAME="$host" LEGO_HOOK_CERT_PATH="$cert_store/$host.crt" \
+            LEGO_HOOK_CERT_KEY_PATH="$cert_store/$host.key" "$hook_dir/lego-deploy-hook.sh"
+    else
+        step "Obtaining the first certificate for $host (DNS-01 via Domeneshop)"
+        systemctl start lego-renew.service
+    fi
 fi
 
 step "Installing the Caddyfile"
